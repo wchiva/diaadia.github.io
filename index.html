@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="dark">
+  <title>FlowTask — Dashboard & Kanban</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- ======================= CARREGANDO ======================= -->
+  <div id="screen-loading" class="flex-1 flex items-center justify-center text-sm text-zinc-500">Carregando…</div>
+
+  <!-- ======================= ERRO DE CONFIGURAÇÃO ======================= -->
+  <div id="screen-config" class="flex-1 items-center justify-center p-4" hidden>
+    <div class="ft-panel max-w-md w-full p-6">
+      <h1 class="text-lg font-bold text-red-400 mb-2">Configuração ausente</h1>
+      <p class="text-sm text-zinc-400">As variáveis <code class="text-brand-400">SUPABASE_URL</code> e <code class="text-brand-400">SUPABASE_ANON_KEY</code> não foram definidas no momento do build. Consulte o README (seção "Publicação").</p>
+    </div>
+  </div>
+
+  <!-- ======================= LOGIN / RECUPERAÇÃO ======================= -->
+  <div id="screen-auth" class="flex-1 items-center justify-center p-4" hidden>
+    <div class="w-full max-w-sm">
+      <div class="flex items-center justify-center space-x-3 mb-6">
+        <img alt="" class="h-10 w-auto object-contain" id="auth-logo" hidden>
+        <div id="auth-brand" class="font-bold text-2xl text-brand-500">FlowTask</div>
+      </div>
+      <div class="ft-panel p-6">
+        <div id="auth-message" role="alert" class="hidden text-sm rounded-lg p-3 mb-4 border"></div>
+
+        <!-- Entrar -->
+        <form id="form-login" class="space-y-4" novalidate>
+          <h1 class="text-lg font-bold text-zinc-100">Entrar</h1>
+          <div>
+            <label class="ft-label" for="login-email">E-mail</label>
+            <input class="ft-input" type="email" id="login-email" autocomplete="username" required maxlength="254">
+          </div>
+          <div>
+            <label class="ft-label" for="login-password">Senha</label>
+            <input class="ft-input" type="password" id="login-password" autocomplete="current-password" required maxlength="128">
+          </div>
+          <button type="submit" id="btn-login" class="ft-btn ft-btn-primary w-full">Entrar</button>
+          <button type="button" id="link-forgot" class="block mx-auto text-xs text-brand-500 hover:underline">Esqueci minha senha</button>
+        </form>
+
+        <!-- Recuperar senha -->
+        <form id="form-forgot" class="space-y-4" hidden novalidate>
+          <h1 class="text-lg font-bold text-zinc-100">Recuperar senha</h1>
+          <p class="text-xs text-zinc-400">Informe seu e-mail. Se ele estiver cadastrado, enviaremos um link para criar uma nova senha.</p>
+          <div>
+            <label class="ft-label" for="forgot-email">E-mail</label>
+            <input class="ft-input" type="email" id="forgot-email" autocomplete="username" required maxlength="254">
+          </div>
+          <button type="submit" id="btn-forgot" class="ft-btn ft-btn-primary w-full">Enviar link</button>
+          <button type="button" id="link-back-login" class="block mx-auto text-xs text-brand-500 hover:underline">Voltar ao login</button>
+        </form>
+
+        <!-- Definir nova senha (recuperação, convite ou senha temporária) -->
+        <form id="form-newpass" class="space-y-4" hidden novalidate>
+          <h1 class="text-lg font-bold text-zinc-100">Defina sua senha</h1>
+          <p class="text-xs text-zinc-400">Escolha uma senha com pelo menos 8 caracteres.</p>
+          <div>
+            <label class="ft-label" for="newpass-1">Nova senha</label>
+            <input class="ft-input" type="password" id="newpass-1" autocomplete="new-password" required minlength="8" maxlength="128">
+          </div>
+          <div>
+            <label class="ft-label" for="newpass-2">Repita a nova senha</label>
+            <input class="ft-input" type="password" id="newpass-2" autocomplete="new-password" required minlength="8" maxlength="128">
+          </div>
+          <button type="submit" id="btn-newpass" class="ft-btn ft-btn-primary w-full">Salvar senha</button>
+          <button type="button" id="link-newpass-cancel" class="block mx-auto text-xs text-zinc-500 hover:underline">Sair</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= APLICAÇÃO (só após login) ======================= -->
+  <div id="screen-app" class="flex-1 flex-col pb-16 md:pb-0" hidden>
+
+    <header class="bg-[#181818] border-b border-[#2a2a2a] sticky top-0 z-30 px-4 py-3">
+      <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+        <div class="flex items-center space-x-3 min-w-0">
+          <img alt="Logo" class="h-8 w-auto object-contain" id="app-logo" hidden>
+          <div id="app-brand" class="font-bold text-lg text-brand-500">FlowTask</div>
+          <span class="hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">MVP</span>
+          <span id="rt-status" class="hidden text-[10px] px-2 py-0.5 rounded-full border" title=""></span>
+        </div>
+
+        <nav class="hidden md:flex items-center space-x-1" aria-label="Navegação principal">
+          <button data-tab="kanban" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium">Dashboard</button>
+          <button data-tab="calendar" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium">Calendário</button>
+          <button data-tab="users" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium">Usuários</button>
+          <button data-tab="stats" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium">Estatísticas</button>
+        </nav>
+
+        <div class="flex items-center space-x-2">
+          <button id="btn-export" class="ft-btn ft-btn-dark !px-3 !py-1.5 !text-xs">📥 <span class="hidden sm:inline">Exportar CSV</span></button>
+          <button id="btn-new-task" class="ft-btn ft-btn-primary !px-3.5 !py-1.5">+ <span class="hidden sm:inline">Nova Tarefa</span></button>
+          <div class="flex items-center space-x-2 pl-2 border-l border-[#2a2a2a]">
+            <div class="text-right leading-tight hidden sm:block max-w-[10rem]">
+              <p id="me-name" class="text-xs font-semibold text-zinc-200 truncate"></p>
+              <p id="me-role" class="text-[10px] font-semibold uppercase tracking-wider"></p>
+            </div>
+            <button id="btn-logout" class="ft-btn ft-btn-dark !px-3 !py-1.5 !text-xs" title="Encerrar sessão">Sair</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- usuário conectado (celular) -->
+    <div class="sm:hidden flex items-center justify-between gap-3 px-4 py-1.5 text-[11px] bg-[#151515] border-b border-[#2a2a2a]">
+      <span id="me-name-m" class="text-zinc-300 truncate"></span>
+      <span id="me-role-m" class="font-semibold shrink-0"></span>
+    </div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
+
+      <!-- TAB: KANBAN -->
+      <section id="tab-kanban" class="tab-content">
+        <div class="ft-panel p-4 mb-6">
+          <div class="flex flex-wrap items-end gap-3">
+            <div>
+              <label for="f-user" class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Responsável</label>
+              <select id="f-user" class="ft-input-sm"><option value="all">Todos os membros</option></select>
+            </div>
+            <div>
+              <label for="f-status" class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Status</label>
+              <select id="f-status" class="ft-input-sm">
+                <option value="all">Todos</option>
+                <option value="todo">Pendente</option>
+                <option value="in_progress">Em andamento</option>
+                <option value="done">Concluída</option>
+              </select>
+            </div>
+            <div>
+              <label for="f-priority" class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Prioridade</label>
+              <select id="f-priority" class="ft-input-sm">
+                <option value="all">Todas</option>
+                <option value="high">Alta</option>
+                <option value="medium">Média</option>
+                <option value="low">Baixa</option>
+              </select>
+            </div>
+            <div>
+              <label for="f-start" class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Prazo de</label>
+              <input type="date" id="f-start" class="ft-input-sm">
+            </div>
+            <div>
+              <label for="f-end" class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Prazo até</label>
+              <input type="date" id="f-end" class="ft-input-sm">
+            </div>
+            <button id="btn-clear-filters" class="pb-2 text-xs text-brand-500 hover:underline">Limpar filtros</button>
+          </div>
+        </div>
+
+        <div id="kanban-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div data-col-wrap="todo" class="ft-panel p-4 flex flex-col md:h-[calc(100vh-260px)] md:min-h-[480px]">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-[#2a2a2a]">
+              <h2 class="font-semibold text-zinc-200">Pendente</h2>
+              <span id="count-todo" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#222] text-zinc-400">0</span>
+            </div>
+            <div id="col-todo" data-col="todo" class="kanban-col flex-1 overflow-y-auto space-y-3 pr-1 min-h-24"></div>
+          </div>
+          <div data-col-wrap="in_progress" class="ft-panel p-4 flex flex-col md:h-[calc(100vh-260px)] md:min-h-[480px]">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-[#2a2a2a]">
+              <h2 class="font-semibold text-zinc-200">Em andamento</h2>
+              <span id="count-in_progress" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#222] text-zinc-400">0</span>
+            </div>
+            <div id="col-in_progress" data-col="in_progress" class="kanban-col flex-1 overflow-y-auto space-y-3 pr-1 min-h-24"></div>
+          </div>
+          <div data-col-wrap="done" class="ft-panel p-4 flex flex-col md:h-[calc(100vh-260px)] md:min-h-[480px]">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-[#2a2a2a]">
+              <h2 class="font-semibold text-zinc-200">Concluída</h2>
+              <span id="count-done" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#222] text-zinc-400">0</span>
+            </div>
+            <div id="col-done" data-col="done" class="kanban-col flex-1 overflow-y-auto space-y-3 pr-1 min-h-24"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CALENDÁRIO -->
+      <section id="tab-calendar" class="tab-content max-w-4xl mx-auto" hidden>
+        <div class="ft-panel p-4 sm:p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 id="calendar-month-year" class="text-lg font-bold text-zinc-200"></h2>
+            <div class="flex space-x-2">
+              <button id="cal-prev" class="px-3 py-1 bg-[#222] hover:bg-[#2a2a2a] rounded text-xs">← Anterior</button>
+              <button id="cal-next" class="px-3 py-1 bg-[#222] hover:bg-[#2a2a2a] rounded text-xs">Próximo →</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-7 gap-1 text-center font-bold text-[10px] sm:text-xs text-zinc-500 mb-2">
+            <div>DOM</div><div>SEG</div><div>TER</div><div>QUA</div><div>QUI</div><div>SEX</div><div>SÁB</div>
+          </div>
+          <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
+        </div>
+      </section>
+
+      <!-- TAB: USUÁRIOS -->
+      <section id="tab-users" class="tab-content max-w-3xl mx-auto" hidden>
+        <div id="user-create-panel" class="ft-panel p-4 sm:p-6 mb-6" hidden>
+          <h2 class="text-lg font-bold text-zinc-200 mb-4">Cadastrar novo usuário</h2>
+          <form id="form-user-create" class="grid grid-cols-1 sm:grid-cols-2 gap-4" novalidate>
+            <div><label class="ft-label" for="uc-name">Nome</label><input class="ft-input" type="text" id="uc-name" required maxlength="120"></div>
+            <div><label class="ft-label" for="uc-email">E-mail</label><input class="ft-input" type="email" id="uc-email" required maxlength="254"></div>
+            <div><label class="ft-label" for="uc-title">Cargo</label><input class="ft-input" type="text" id="uc-title" maxlength="120"></div>
+            <div>
+              <label class="ft-label" for="uc-role">Nível de acesso</label>
+              <select class="ft-input" id="uc-role"><option value="member">Membro</option><option value="admin">Administrador</option></select>
+            </div>
+            <div>
+              <label class="ft-label" for="uc-mode">Como o usuário vai entrar</label>
+              <select class="ft-input" id="uc-mode">
+                <option value="password">Eu defino uma senha temporária</option>
+                <option value="invite">Enviar convite por e-mail</option>
+              </select>
+            </div>
+            <div id="uc-pass-wrap">
+              <label class="ft-label" for="uc-pass">Senha temporária (mín. 8)</label>
+              <input class="ft-input" type="text" id="uc-pass" autocomplete="off" minlength="8" maxlength="128">
+            </div>
+            <p class="sm:col-span-2 text-[11px] text-zinc-500">Com senha temporária, o usuário será obrigado a trocá-la no primeiro acesso. O convite por e-mail exige o envio de e-mails configurado no Supabase (veja o README).</p>
+            <div class="sm:col-span-2 flex justify-end"><button type="submit" id="btn-user-create" class="ft-btn ft-btn-primary">Cadastrar</button></div>
+          </form>
+        </div>
+        <div class="ft-panel p-4 sm:p-6">
+          <h2 class="text-lg font-bold text-zinc-200 mb-4">Equipe</h2>
+          <div id="users-list" class="space-y-3"></div>
+        </div>
+      </section>
+
+      <!-- TAB: ESTATÍSTICAS -->
+      <section id="tab-stats" class="tab-content max-w-3xl mx-auto" hidden>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+          <div class="ft-panel p-5"><p class="text-xs font-semibold text-zinc-500 uppercase">Total de tarefas</p><p id="stat-total" class="text-3xl font-bold text-zinc-100 mt-2">0</p></div>
+          <div class="ft-panel p-5"><p class="text-xs font-semibold text-zinc-500 uppercase">Taxa de conclusão</p><p id="stat-rate" class="text-3xl font-bold text-brand-500 mt-2">0%</p></div>
+          <div class="ft-panel p-5"><p class="text-xs font-semibold text-zinc-500 uppercase">Usuários ativos</p><p id="stat-users" class="text-3xl font-bold text-zinc-100 mt-2">0</p></div>
+          <div class="ft-panel p-5"><p class="text-xs font-semibold text-zinc-500 uppercase">Em andamento</p><p id="stat-progress" class="text-3xl font-bold text-zinc-100 mt-2">0</p></div>
+          <div class="ft-panel p-5"><p class="text-xs font-semibold text-zinc-500 uppercase">Atrasadas</p><p id="stat-overdue" class="text-3xl font-bold text-red-400 mt-2">0</p></div>
+          <div class="ft-panel p-5"><p class="text-xs font-semibold text-zinc-500 uppercase">Alta prioridade abertas</p><p id="stat-high" class="text-3xl font-bold text-zinc-100 mt-2">0</p></div>
+        </div>
+        <div class="ft-panel p-4 sm:p-6">
+          <h2 class="text-sm font-bold text-zinc-200 mb-4">Tarefas por responsável</h2>
+          <div id="stat-by-user" class="space-y-3"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Navegação mobile -->
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#181818] border-t border-[#2a2a2a] grid grid-cols-4" aria-label="Navegação">
+      <button data-tab="kanban" class="nav-btn py-3 text-[11px] font-medium">Dashboard</button>
+      <button data-tab="calendar" class="nav-btn py-3 text-[11px] font-medium">Calendário</button>
+      <button data-tab="users" class="nav-btn py-3 text-[11px] font-medium">Usuários</button>
+      <button data-tab="stats" class="nav-btn py-3 text-[11px] font-medium">Estatísticas</button>
+    </nav>
+  </div>
+
+  <!-- ======================= MODAL: EXPORTAR ======================= -->
+  <div id="modal-export" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 items-center justify-center p-4" hidden role="dialog" aria-modal="true" aria-labelledby="export-title">
+    <div class="bg-[#181818] border border-[#2a2a2a] rounded-2xl w-full max-w-sm p-6 max-h-full overflow-y-auto">
+      <h3 id="export-title" class="text-lg font-bold text-zinc-100 mb-4">Exportar relatório CSV</h3>
+      <form id="form-export" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="ft-label" for="export-start">Prazo de</label><input type="date" id="export-start" class="ft-input"></div>
+          <div><label class="ft-label" for="export-end">Prazo até</label><input type="date" id="export-end" class="ft-input"></div>
+        </div>
+        <div>
+          <label class="ft-label" for="export-type">Dados para exportar</label>
+          <select id="export-type" class="ft-input">
+            <option value="all_tasks">Todas as tarefas</option>
+            <option value="done_tasks">Apenas tarefas concluídas</option>
+            <option value="users">Usuários cadastrados</option>
+          </select>
+        </div>
+        <div>
+          <label class="ft-label" for="export-sep">Separador de colunas</label>
+          <select id="export-sep" class="ft-input">
+            <option value=";">Ponto e vírgula (Excel em português)</option>
+            <option value=",">Vírgula (padrão internacional)</option>
+          </select>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4 border-t border-[#2a2a2a]">
+          <button type="button" data-close="modal-export" class="ft-btn ft-btn-ghost">Cancelar</button>
+          <button type="submit" class="ft-btn ft-btn-primary">Baixar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================= MODAL: TAREFA ======================= -->
+  <div id="modal-task" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 items-center justify-center p-4" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="bg-[#181818] border border-[#2a2a2a] rounded-2xl w-full max-w-md p-6 max-h-full overflow-y-auto">
+      <h3 id="modal-title" class="text-lg font-bold text-zinc-100 mb-4">Nova tarefa</h3>
+      <form id="form-task" class="space-y-4" novalidate>
+        <input type="hidden" id="task-id">
+        <div><label class="ft-label" for="task-title">Título</label><input type="text" id="task-title" class="ft-input" required maxlength="200"></div>
+        <div><label class="ft-label" for="task-desc">Descrição</label><textarea id="task-desc" rows="3" class="ft-input" maxlength="2000"></textarea></div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="ft-label" for="task-priority">Prioridade</label>
+            <select id="task-priority" class="ft-input">
+              <option value="low">Baixa</option><option value="medium" selected>Média</option><option value="high">Alta</option>
+            </select>
+          </div>
+          <div><label class="ft-label" for="task-duedate">Prazo</label><input type="date" id="task-duedate" class="ft-input"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="ft-label" for="task-status">Status</label>
+            <select id="task-status" class="ft-input">
+              <option value="todo">Pendente</option><option value="in_progress">Em andamento</option><option value="done">Concluída</option>
+            </select>
+          </div>
+          <div><label class="ft-label" for="task-assignee">Responsável</label><select id="task-assignee" class="ft-input"></select></div>
+        </div>
+        <p id="task-hint" class="text-[11px] text-zinc-500 hidden"></p>
+        <p id="task-meta" class="text-[11px] text-zinc-500 hidden"></p>
+        <div class="flex items-center justify-between pt-4 border-t border-[#2a2a2a]">
+          <button type="button" id="btn-task-delete" class="ft-btn ft-btn-danger" hidden>Excluir</button>
+          <div class="flex space-x-3 ml-auto">
+            <button type="button" data-close="modal-task" class="ft-btn ft-btn-ghost">Fechar</button>
+            <button type="submit" id="btn-task-save" class="ft-btn ft-btn-primary">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Avisos -->
+  <div id="toasts" class="fixed top-4 right-4 left-4 sm:left-auto sm:w-80 z-[60] space-y-2 pointer-events-none" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
